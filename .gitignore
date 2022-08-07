@@ -1,5 +1,9 @@
-# git push
+# Git push
 *.bat
+
+# Models
+*.tar.gz
+**/data-unversioned/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
