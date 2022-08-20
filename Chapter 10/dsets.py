@@ -34,15 +34,15 @@ def getCandidateInfoList(requireOnDisk_bool=True):
     # We construct a set with all series_uids that are present on disk.
     # This will let us use the data, even if we haven't downloaded all of
     # the subsets yet.
-    mhd_list = glob.glob('G:/LUNA16/subset*/*.mhd')
-    presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}
+    mhd_list = glob.glob('G:/LUNA16/subset*/*.mhd')     # 得到很多个完整路径G:/foo/bar/114514.mhd
+    presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}   # 每个路径取114514.mhd部分再截取点前部分
 
     diameter_dict = {}
     with open('G:/LUNA16/annotations.csv', "r") as f:
-        for row in list(csv.reader(f))[1:]:
-            series_uid = row[0]
-            annotationCenter_xyz = tuple([float(x) for x in row[1:4]])
-            annotationDiameter_mm = float(row[4])
+        for row in list(csv.reader(f))[1:]:     # 从第二行开始, 读取一行信息
+            series_uid = row[0]     # 获取这一行的第一个值seriesuid
+            annotationCenter_xyz = tuple([float(x) for x in row[1:4]])      # 获取这一行的二三四值x,y,z
+            annotationDiameter_mm = float(row[4])       # 获取这一行的第五个值d
 
             diameter_dict.setdefault(series_uid, []).append(
                 (annotationCenter_xyz, annotationDiameter_mm)
