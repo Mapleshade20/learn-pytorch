@@ -1,18 +1,11 @@
-import copy
-import csv
-import functools
-import glob
+import copy, csv, functools, glob
 import os
-
 from collections import namedtuple
-
 import SimpleITK as sitk
 import numpy as np
-
 import torch
 import torch.cuda
 from torch.utils.data import Dataset
-
 from util.disk import getCache
 from util.util import XyzTuple, xyz2irc
 from util.logconf import logging
@@ -29,11 +22,13 @@ CandidateInfoTuple = namedtuple(
     'isNodule_bool, diameter_mm, series_uid, center_xyz',
 )
 
+"""
+从anno取结节, 到candi排除位置相差太大的. 输出CandidateInfoTuple, 包含所有结节的信息, 和非结节的除diameter之外的信息.
+"""
 @functools.lru_cache(1)
 def getCandidateInfoList(requireOnDisk_bool=True):
     # We construct a set with all series_uids that are present on disk.
-    # This will let us use the data, even if we haven't downloaded all of
-    # the subsets yet.
+
     mhd_list = glob.glob('G:/LUNA16/subset*/*.mhd')     # 得到很多个完整路径G:/foo/bar/114514.mhd
     presentOnDisk_set = {os.path.split(p)[-1][:-4] for p in mhd_list}   # 每个路径取114514.mhd部分再截取点前部分
 
@@ -44,7 +39,8 @@ def getCandidateInfoList(requireOnDisk_bool=True):
             annotationCenter_xyz = tuple([float(x) for x in row[1:4]])      # 获取这一行的二三四值x,y,z
             annotationDiameter_mm = float(row[4])       # 获取这一行的第五个值d
 
-            diameter_dict.setdefault(series_uid, []).append(
+            diameter_dict.setdefault(series_uid, []).append(    # 向[]内append
+                # a.setdefault(key, value)等同于a[key]但键不存在时新建一个key-value键对
                 (annotationCenter_xyz, annotationDiameter_mm)
             )
 
@@ -54,19 +50,19 @@ def getCandidateInfoList(requireOnDisk_bool=True):
             series_uid = row[0]
 
             if series_uid not in presentOnDisk_set and requireOnDisk_bool:
-                continue
+                continue        # 从csv获取的全部uid中选出那些在磁盘上的
 
-            isNodule_bool = bool(int(row[4]))
+            isNodule_bool = bool(int(row[4]))   # 从candidate.csv获取是否为结节的class 0/1
             candidateCenter_xyz = tuple([float(x) for x in row[1:4]])
 
             candidateDiameter_mm = 0.0
-            for annotation_tup in diameter_dict.get(series_uid, []):
+            for annotation_tup in diameter_dict.get(series_uid, []):    # 如果不是结节, 返回空[], 不会执行for
                 annotationCenter_xyz, annotationDiameter_mm = annotation_tup
                 for i in range(3):
                     delta_mm = abs(candidateCenter_xyz[i] - annotationCenter_xyz[i])
                     if delta_mm > annotationDiameter_mm / 4:
-                        break
-                else:
+                        break       # 排除那些同uid但位置在candidate和annotation之间差太远的点
+                else:   # 在for中未break的前提下, 最终执行, 正式把符合要求的点坐标传出去
                     candidateDiameter_mm = annotationDiameter_mm
                     break
 
@@ -77,20 +73,20 @@ def getCandidateInfoList(requireOnDisk_bool=True):
                 candidateCenter_xyz,
             ))
 
-    candidateInfo_list.sort(reverse=True)
+    candidateInfo_list.sort(reverse=True)   # sort descend
     return candidateInfo_list
 
 class Ct:
     def __init__(self, series_uid):
         mhd_path = glob.glob(
-            'G:/LUNA16/subset*/{}.mhd'.format(series_uid)
+            'G:/LUNA16/subset*/{}.mhd'.format(series_uid)   # 星号表示通配符
         )[0]
 
-        ct_mhd = sitk.ReadImage(mhd_path)
-        ct_a = np.array(sitk.GetArrayFromImage(ct_mhd), dtype=np.float32)
+        ct_mhd = sitk.ReadImage(mhd_path)       # 让sitk解析图像, 同时隐式地使用了.raw文件
+        ct_a = np.array(sitk.GetArrayFromImage(ct_mhd), dtype=np.float32)   # 把GetArrayFromImage得到的转化成float32
 
         # CTs are natively expressed in https://en.wikipedia.org/wiki/Hounsfield_scale
-        # HU are scaled oddly, with 0 g/cc (air, approximately) being -1000 and 1 g/cc (water) being 0.
+        # HU are scaled oddly, with 0 g/cc (air) being -1000 and 1 g/cc (water) being 0.
         # The lower bound gets rid of negative density stuff used to indicate out-of-FOV
         # The upper bound nukes any weird hotspots and clamps bone down
         ct_a.clip(-1000, 1000, ct_a)
