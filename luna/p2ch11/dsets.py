@@ -1,4 +1,4 @@
-import copy, csv, functools, glob
+import copy, csv, functools, glob, random
 import os
 from collections import namedtuple
 import SimpleITK as sitk
@@ -77,7 +77,7 @@ def getCandidateInfoList(requireOnDisk_bool=True):
     return candidateInfo_list
 
 class Ct:
-    def __init__(self, series_uid):
+    def __init__(self, series_uid):     # 坐标系变换
         mhd_path = glob.glob(
             'G:/LUNA16/subset*/{}.mhd'.format(series_uid)   # 星号表示通配符
         )[0]
@@ -142,11 +142,13 @@ def getCtRawCandidate(series_uid, center_xyz, width_irc):
     ct_chunk, center_irc = ct.getRawCandidate(center_xyz, width_irc)
     return ct_chunk, center_irc
 
+
 class LunaDataset(Dataset):
     def __init__(self,
                  val_stride=0,
                  isValSet_bool=None,
                  series_uid=None,
+                 sortby_str='random',
             ):
         self.candidateInfo_list = copy.copy(getCandidateInfoList())
 
@@ -162,6 +164,15 @@ class LunaDataset(Dataset):
         elif val_stride > 0:
             del self.candidateInfo_list[::val_stride]
             assert self.candidateInfo_list
+
+        if sortby_str == 'random':
+            random.shuffle(self.candidateInfo_list)
+        elif sortby_str == 'series_uid':
+            self.candidateInfo_list.sort(key=lambda x: (x.series_uid, x.center_xyz))
+        elif sortby_str == 'label_and_size':
+            pass
+        else:
+            raise Exception("Unknown sort: " + repr(sortby_str))
 
         log.info("{!r}: {} {} samples".format(
             self,
@@ -181,9 +192,7 @@ class LunaDataset(Dataset):
             candidateInfo_tup.center_xyz,
             width_irc,
         )
-
-        candidate_t = torch.from_numpy(candidate_a)
-        candidate_t = candidate_t.to(torch.float32)
+        candidate_t = torch.from_numpy(candidate_a).to(torch.float32)
         candidate_t = candidate_t.unsqueeze(0)
 
         pos_t = torch.tensor([
@@ -193,9 +202,4 @@ class LunaDataset(Dataset):
             dtype=torch.long,
         )
 
-        return (
-            candidate_t,
-            pos_t,
-            candidateInfo_tup.series_uid,
-            torch.tensor(center_irc),
-        )
+        return candidate_t, pos_t, candidateInfo_tup.series_uid, torch.tensor(center_irc)
