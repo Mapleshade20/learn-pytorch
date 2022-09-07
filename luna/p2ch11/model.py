@@ -15,7 +15,7 @@ class LunaModel(nn.Module):
         super().__init__()
 
         self.tail_batchnorm = nn.BatchNorm3d(1)
-
+        # 通道数逐渐增多
         self.block1 = LunaBlock(in_channels, conv_channels)
         self.block2 = LunaBlock(conv_channels, conv_channels * 2)
         self.block3 = LunaBlock(conv_channels * 2, conv_channels * 4)

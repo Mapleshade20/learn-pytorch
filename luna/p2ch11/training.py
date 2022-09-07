@@ -165,7 +165,7 @@ class LunaTrainingApp:
 
     def doTraining(self, epoch_ndx, train_dl):
         self.model.train()
-        trnMetrics_g = torch.zeros(
+        trnMetrics_g = torch.zeros(     # 初始化一个空的指标数组
             METRICS_SIZE,
             len(train_dl.dataset),
             device=self.device,
@@ -179,7 +179,7 @@ class LunaTrainingApp:
         for batch_ndx, batch_tup in batch_iter:
             self.optimizer.zero_grad()
 
-            loss_var = self.computeBatchLoss(
+            loss_var = self.computeBatchLoss(   # 计算loss
                 batch_ndx,
                 batch_tup,
                 train_dl.batch_size,
@@ -222,7 +222,6 @@ class LunaTrainingApp:
         return valMetrics_g.to('cpu')
 
 
-
     def computeBatchLoss(self, batch_ndx, batch_tup, batch_size, metrics_g):
         input_t, label_t, _series_list, _center_list = batch_tup
 
@@ -231,7 +230,7 @@ class LunaTrainingApp:
 
         logits_g, probability_g = self.model(input_g)
 
-        loss_func = nn.CrossEntropyLoss(reduction='none')
+        loss_func = nn.CrossEntropyLoss(reduction='none')   # reduction='none' 给出每个样本的损失
         loss_g = loss_func(
             logits_g,
             label_g[:,1],
